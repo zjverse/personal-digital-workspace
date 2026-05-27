@@ -10,17 +10,9 @@ export const db = new DatabaseSync(config.databasePath);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
 
 export function migrate() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      name TEXT NOT NULL DEFAULT 'Owner',
-      role TEXT NOT NULL DEFAULT 'admin',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
+  db.exec('PRAGMA foreign_keys = OFF;');
 
+  db.exec(`
     CREATE TABLE IF NOT EXISTS categories (
       id TEXT PRIMARY KEY,
       parent_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
@@ -54,58 +46,12 @@ export function migrate() {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS tags (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      color TEXT NOT NULL DEFAULT '#64748b',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS website_tags (
-      website_id TEXT NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
-      tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-      PRIMARY KEY (website_id, tag_id)
-    );
-
     CREATE TABLE IF NOT EXISTS favorites (
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL DEFAULT 'local-owner',
       website_id TEXT NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (user_id, website_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS import_history (
-      id TEXT PRIMARY KEY,
-      filename TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      total_count INTEGER NOT NULL,
-      added_count INTEGER NOT NULL,
-      existing_count INTEGER NOT NULL,
-      updated_count INTEGER NOT NULL,
-      duplicate_count INTEGER NOT NULL,
-      deleted_count INTEGER NOT NULL,
-      snapshot_id TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS snapshots (
-      id TEXT PRIMARY KEY,
-      reason TEXT NOT NULL,
-      data TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS operation_history (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
-      entity_type TEXT NOT NULL,
-      entity_id TEXT,
-      summary TEXT NOT NULL,
-      before_data TEXT,
-      after_data TEXT,
-      import_id TEXT REFERENCES import_history(id) ON DELETE SET NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE INDEX IF NOT EXISTS idx_websites_domain ON websites(domain);
@@ -118,6 +64,35 @@ export function migrate() {
   } catch {
     // Existing databases already have this column.
   }
+
+  db.exec(`
+    DROP TABLE IF EXISTS favorites_compact;
+    CREATE TABLE favorites_compact (
+      user_id TEXT NOT NULL DEFAULT 'local-owner',
+      website_id TEXT NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, website_id)
+    );
+    INSERT OR IGNORE INTO favorites_compact (user_id, website_id, sort_order, created_at)
+    SELECT 'local-owner', website_id, MIN(COALESCE(sort_order, 0)), MIN(created_at)
+    FROM favorites
+    WHERE website_id IN (SELECT id FROM websites)
+    GROUP BY website_id;
+    DROP TABLE favorites;
+    ALTER TABLE favorites_compact RENAME TO favorites;
+  `);
+
+  db.exec(`
+    DROP TABLE IF EXISTS website_tags;
+    DROP TABLE IF EXISTS tags;
+    DROP TABLE IF EXISTS operation_history;
+    DROP TABLE IF EXISTS snapshots;
+    DROP TABLE IF EXISTS import_history;
+    DROP TABLE IF EXISTS users;
+  `);
+
+  db.exec('PRAGMA foreign_keys = ON;');
 }
 
 export type Row = Record<string, unknown>;

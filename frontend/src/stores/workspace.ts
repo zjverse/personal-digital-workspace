@@ -1,16 +1,13 @@
 import { defineStore } from 'pinia';
 import { api } from '../api';
-import type { Category, ImportHistory, Website } from '../types';
+import type { Category, Website } from '../types';
 
 type ViewMode = 'all' | 'favorites' | 'recent';
 
 export const useWorkspaceStore = defineStore('workspace', {
   state: () => ({
-    token: localStorage.getItem('pdw_token') || '',
-    user: null as null | { id: string; email: string },
     categories: [] as Category[],
     websites: [] as Website[],
-    imports: [] as ImportHistory[],
     overview: null as null | Record<string, number>,
     activeCategoryId: '',
     activeView: 'all' as ViewMode,
@@ -19,7 +16,6 @@ export const useWorkspaceStore = defineStore('workspace', {
     loading: false
   }),
   getters: {
-    authed: (state) => Boolean(state.token),
     activeTitle: (state) => {
       if (state.query.trim()) return '搜索结果';
       if (state.activeView === 'favorites') return '常用网址';
@@ -28,17 +24,6 @@ export const useWorkspaceStore = defineStore('workspace', {
     }
   },
   actions: {
-    async login(email: string, password: string) {
-      const { data } = await api.post('/auth/login', { email, password });
-      this.token = data.token;
-      this.user = data.user;
-      localStorage.setItem('pdw_token', data.token);
-    },
-    logout() {
-      this.token = '';
-      this.user = null;
-      localStorage.removeItem('pdw_token');
-    },
     async bootstrap() {
       await Promise.all([this.fetchCategories(), this.fetchWebsites(), this.fetchOverview()]);
     },
@@ -65,10 +50,6 @@ export const useWorkspaceStore = defineStore('workspace', {
       } finally {
         this.loading = false;
       }
-    },
-    async fetchImports() {
-      const { data } = await api.get('/imports');
-      this.imports = data;
     },
     async setCategory(id: string) {
       this.activeView = 'all';
@@ -99,28 +80,12 @@ export const useWorkspaceStore = defineStore('workspace', {
       await api.post(`/websites/${site.id}/visit`);
       window.location.href = site.url;
     },
-    async remove(site: Website) {
-      await api.delete(`/websites/${site.id}`);
-      await this.bootstrap();
-    },
-    async createWebsite(payload: { title?: string; url: string; description?: string; categoryId?: string; tags?: string[] }) {
-      await api.post('/websites', payload);
-      await this.bootstrap();
-    },
-    async updateWebsite(id: string, payload: { title?: string; url?: string; description?: string; categoryId?: string; tags?: string[] }) {
-      await api.patch(`/websites/${id}`, payload);
-      await this.bootstrap();
-    },
     async importBookmarks(file: File) {
       const form = new FormData();
       form.append('file', file);
       const { data } = await api.post('/bookmarks/import', form);
       await this.bootstrap();
       return data;
-    },
-    async rollbackImport(id: string) {
-      await api.post(`/imports/${id}/rollback`);
-      await this.bootstrap();
     },
     setLayout(layout: string) {
       this.layout = layout;

@@ -5,11 +5,6 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: DashboardView },
-    { path: '/admin', redirect: '/' },
-    { path: '/login', redirect: '/' }
+    { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
-});
-
-router.beforeEach((to) => {
-  if (to.path === '/admin' || to.path === '/login') return '/';
 });

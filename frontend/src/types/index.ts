@@ -20,22 +20,7 @@ export type Website = {
   category_name: string | null;
   category_color: string | null;
   favorite: number;
-  tags: string;
   created_at: string;
   added_at: string | null;
   last_visited_at: string | null;
-};
-
-export type ImportHistory = {
-  id: string;
-  filename: string;
-  mode: string;
-  total_count: number;
-  added_count: number;
-  existing_count: number;
-  updated_count: number;
-  duplicate_count: number;
-  deleted_count: number;
-  snapshot_id: string;
-  created_at: string;
 };

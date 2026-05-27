@@ -1,7 +1,7 @@
 import { db, row, rows } from '../db.js';
 import { domainOf, faviconFor, hashUrl, htmlDecode, id, normalizeUrl, now } from '../utils.js';
 
-export type SyncMode = 'add-only' | 'update-title' | 'full-sync';
+const localOwnerId = 'local-owner';
 
 export type BookmarkItem = {
   title: string;
@@ -74,47 +74,6 @@ function parseNetscapeHtml(html: string): BookmarkItem[] {
   return out;
 }
 
-export function createSnapshot(reason: string) {
-  const snapshotId = id();
-  const data = {
-    categories: rows('SELECT * FROM categories'),
-    websites: rows('SELECT * FROM websites'),
-    tags: rows('SELECT * FROM tags'),
-    website_tags: rows('SELECT * FROM website_tags'),
-    favorites: rows('SELECT * FROM favorites')
-  };
-  db.prepare('INSERT INTO snapshots (id, reason, data) VALUES (?, ?, ?)').run(snapshotId, reason, JSON.stringify(data));
-  return snapshotId;
-}
-
-export function restoreSnapshot(snapshotId: string) {
-  const snap = row<{ data: string }>('SELECT data FROM snapshots WHERE id = ?', snapshotId);
-  if (!snap) throw new Error('Snapshot not found');
-  const data = JSON.parse(snap.data) as Record<string, Record<string, unknown>[]>;
-  db.exec('BEGIN');
-  try {
-    for (const table of ['favorites', 'website_tags', 'websites', 'tags', 'categories']) db.exec(`DELETE FROM ${table}`);
-    for (const table of ['categories', 'websites', 'tags', 'website_tags', 'favorites']) {
-      for (const record of data[table] ?? []) {
-        const keys = Object.keys(record);
-        const placeholders = keys.map(() => '?').join(',');
-        db.prepare(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${placeholders})`).run(...(keys.map((key) => record[key]) as any[]));
-      }
-    }
-    db.prepare('INSERT INTO operation_history (id, type, entity_type, entity_id, summary) VALUES (?, ?, ?, ?, ?)').run(
-      id(),
-      'restore',
-      'snapshot',
-      snapshotId,
-      '恢复数据库快照'
-    );
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
-}
-
 function ensureCategory(name: string, parentId: string | null = null) {
   const clean = stripEmojiPrefix(name).slice(0, 48) || '待整理';
   const existing = row<{ id: string }>("SELECT id FROM categories WHERE name = ? AND IFNULL(parent_id, '') = IFNULL(?, '')", clean, parentId);
@@ -151,27 +110,9 @@ function iconForCategory(name: string) {
   return 'Folder';
 }
 
-function tagsFor(bookmark: BookmarkItem, categoryName: string) {
-  const domain = domainOf(bookmark.url).split('.').slice(0, -1).join('.') || domainOf(bookmark.url);
-  const folderTag = bookmark.path.at(-1);
-  return Array.from(new Set([categoryName, folderTag, domain].filter(Boolean).map((item) => String(item).slice(0, 32))));
-}
-
-function attachTags(websiteId: string, tagNames: string[]) {
-  for (const name of tagNames) {
-    let tag = row<{ id: string }>('SELECT id FROM tags WHERE name = ?', name);
-    if (!tag) {
-      tag = { id: id() };
-      db.prepare('INSERT INTO tags (id, name) VALUES (?, ?)').run(tag.id, name);
-    }
-    db.prepare('INSERT OR IGNORE INTO website_tags (website_id, tag_id) VALUES (?, ?)').run(websiteId, tag.id);
-  }
-}
-
 export function importBookmarks(params: {
   content: string;
   filename: string;
-  mode?: SyncMode;
 }) {
   const items = parseBookmarkContent(params.content);
   const unique = new Map<string, BookmarkItem>();
@@ -187,7 +128,8 @@ export function importBookmarks(params: {
     }
   }
 
-  const snapshotId = createSnapshot(`import:${params.filename}`);
+  const previousHashes = new Set(rows<{ url_hash: string }>('SELECT url_hash FROM websites').map((site) => site.url_hash));
+  const incomingHashes = new Set(unique.keys());
   const favoriteHashes = new Map<string, { userId: string; sortOrder: number }[]>();
   for (const favorite of rows<{ user_id: string; url_hash: string; sort_order: number }>(
     'SELECT f.user_id, f.sort_order, w.url_hash FROM favorites f JOIN websites w ON w.id = f.website_id'
@@ -195,20 +137,21 @@ export function importBookmarks(params: {
     if (!favoriteHashes.has(favorite.url_hash)) favoriteHashes.set(favorite.url_hash, []);
     favoriteHashes.get(favorite.url_hash)?.push({ userId: favorite.user_id, sortOrder: favorite.sort_order });
   }
-  let added = 0;
-  let existing = 0;
-  let updated = 0;
-  let suspicious = duplicateInFile;
+
+  const added = [...incomingHashes].filter((urlHash) => !previousHashes.has(urlHash)).length;
+  const existing = [...incomingHashes].filter((urlHash) => previousHashes.has(urlHash)).length;
+  const deleted = [...previousHashes].filter((urlHash) => !incomingHashes.has(urlHash)).length;
+  const updated = 0;
+  const suspicious = duplicateInFile;
+  let imported = 0;
 
   db.exec('BEGIN');
   try {
-    db.exec('DELETE FROM website_tags; DELETE FROM favorites; DELETE FROM websites; DELETE FROM tags; DELETE FROM categories;');
+    db.exec('DELETE FROM favorites; DELETE FROM websites; DELETE FROM categories;');
     for (const item of unique.values()) {
       const urlHash = hashUrl(item.url);
       const domain = domainOf(item.url);
-      if (row('SELECT id FROM websites WHERE domain = ? LIMIT 1', domain)) suspicious += 1;
       const categoryId = ensureCategoryPath(item.path);
-      const categoryName = stripEmojiPrefix(item.path.at(-1) ?? '待整理');
       const websiteId = id();
       db.prepare(
         `INSERT INTO websites
@@ -230,41 +173,15 @@ export function importBookmarks(params: {
         item.addDate ? new Date(Number(item.addDate) * 1000).toISOString() : now()
       );
       for (const favorite of favoriteHashes.get(urlHash) ?? []) {
-        db.prepare('INSERT OR IGNORE INTO favorites (user_id, website_id, sort_order) VALUES (?, ?, ?)').run(favorite.userId, websiteId, favorite.sortOrder);
+        db.prepare('INSERT OR IGNORE INTO favorites (user_id, website_id, sort_order) VALUES (?, ?, ?)').run(favorite.userId || localOwnerId, websiteId, favorite.sortOrder);
       }
-      attachTags(websiteId, tagsFor(item, categoryName));
-      added += 1;
+      imported += 1;
     }
 
-    const deleted = 0;
-
-    const importId = id();
-    db.prepare(
-      `INSERT INTO import_history
-       (id, filename, mode, total_count, added_count, existing_count, updated_count, duplicate_count, deleted_count, snapshot_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(importId, params.filename, 'html-order-replace', items.length, added, existing, updated, suspicious, deleted, snapshotId);
-    db.prepare('INSERT INTO operation_history (id, type, entity_type, entity_id, summary, import_id) VALUES (?, ?, ?, ?, ?, ?)').run(
-      id(),
-      'import',
-      'bookmark',
-      importId,
-      `导入 ${params.filename}: 新增 ${added}, 已存在 ${existing}`,
-      importId
-    );
     db.exec('COMMIT');
-    return { importId, snapshotId, total: items.length, added, existing, updated, duplicates: suspicious, deleted };
+    return { total: items.length, imported, added, existing, updated, duplicates: suspicious, deleted };
   } catch (error) {
     db.exec('ROLLBACK');
     throw error;
   }
-}
-
-export function previewSmartClassification() {
-  return [];
-}
-
-export function applySmartClassification(ids: string[]) {
-  void ids;
-  return { changed: 0, snapshotId: '' };
 }
