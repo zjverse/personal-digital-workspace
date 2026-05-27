@@ -1,0 +1,7 @@
+{
+  auto_https off
+}
+
+http://workspace.localhost {
+  reverse_proxy workspace:4000
+}

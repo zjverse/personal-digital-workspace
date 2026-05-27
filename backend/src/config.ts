@@ -11,5 +11,5 @@ export const config = {
   root,
   port: Number(process.env.PORT ?? 4000),
   databasePath: path.resolve(root, process.env.DATABASE_PATH ?? 'data/workspace.sqlite'),
-  frontendOrigin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173'
+  frontendOrigin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:4000'
 };

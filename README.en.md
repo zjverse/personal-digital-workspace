@@ -35,7 +35,7 @@ It shows the final UI style: dark sidebar, light compact cards, common links, mu
 
 - Frontend: Vue 3, Vite, TypeScript, Pinia, Vue Router, TailwindCSS
 - Backend: Node.js, Express, TypeScript, SQLite
-- Deploy: Docker, docker-compose, PM2, Nginx
+- Deploy: Docker, docker-compose, Caddy, PM2
 
 ## Project Structure
 
@@ -47,32 +47,20 @@ It shows the final UI style: dark sidebar, light compact cards, common links, mu
 ├── simple.html               # Static preview page
 ├── Dockerfile
 ├── docker-compose.yml
+├── Caddyfile
 ├── ecosystem.config.cjs
-├── nginx.conf
 ├── .env.example
 └── README.md
 ```
 
 Local runtime data is stored in `data/` by default. It is ignored by Git.
 
-## Quick Start
+## Quick Start (Docker Recommended)
 
-Install dependencies:
-
-```bash
-npm install
-```
-
-Build frontend and backend:
+Build and start the container:
 
 ```bash
-npm run build
-```
-
-Start the server:
-
-```bash
-npm run start
+docker compose up -d --build
 ```
 
 Open:
@@ -81,19 +69,47 @@ Open:
 http://localhost:4000
 ```
 
-## Development
+Check status:
 
 ```bash
-npm run dev
+docker compose ps
 ```
 
-The final app entry is:
+View logs:
+
+```bash
+docker compose logs -f workspace
+```
+
+Stop:
+
+```bash
+docker compose down
+```
+
+Restart:
+
+```bash
+docker compose restart workspace
+```
+
+Runtime data is stored in `./data` on the host and `/app/data` inside the container.
+
+## Local Node Run (Optional)
+
+If you do not use Docker, you can still run it directly with Node:
+
+```bash
+npm install
+npm run build
+npm run start
+```
+
+The app is available at:
 
 ```text
 http://localhost:4000
 ```
-
-The frontend calls backend APIs through `/api`.
 
 ## Bookmark Import Flow
 
@@ -147,36 +163,47 @@ Available variables:
 NODE_ENV=production
 PORT=4000
 DATABASE_PATH=./data/workspace.sqlite
-FRONTEND_ORIGIN=https://workspace.example.com
+FRONTEND_ORIGIN=http://localhost:4000
 ```
 
 ## Changing Ports
 
 The default service port is `4000`.
 
-For normal local or PM2 usage, edit `.env`:
+Docker maps host port `4000` to container port `4000` by default. To change only the host access port, edit [docker-compose.yml](docker-compose.yml):
 
-```bash
-PORT=4000
+```yaml
+ports:
+  - "4001:4000"
 ```
 
-If using PM2, also edit [ecosystem.config.cjs](ecosystem.config.cjs):
+Then open:
+
+```text
+http://localhost:4001
+```
+
+If you want to change the internal app port, update both the environment variable and the port mapping in [docker-compose.yml](docker-compose.yml):
+
+```yaml
+environment:
+  PORT: 4000
+ports:
+  - "4000:4000"
+```
+
+If using PM2, edit [ecosystem.config.cjs](ecosystem.config.cjs):
 
 ```js
 PORT: 4000
 ```
 
-If using Docker, edit [docker-compose.yml](docker-compose.yml):
+If using Caddy as a reverse proxy, edit [Caddyfile](Caddyfile):
 
-```yaml
-environment:
-  PORT: 4000
-```
-
-If Nginx proxies to a different internal port, edit [nginx.conf](nginx.conf):
-
-```nginx
-proxy_pass http://workspace:4000;
+```caddyfile
+workspace.localhost {
+  reverse_proxy workspace:4000
+}
 ```
 
 ## Scripts
@@ -196,13 +223,52 @@ npm --workspace backend run favicons
 
 ## Docker
 
-Build and run:
+Start the app container:
 
 ```bash
 docker compose up -d --build
 ```
 
-`docker-compose.yml` includes Nginx and proxies requests to the workspace service.
+Stop the app container:
+
+```bash
+docker compose down
+```
+
+Optionally start Caddy reverse proxy:
+
+```bash
+docker compose --profile proxy up -d --build
+```
+
+With Caddy enabled, open:
+
+```text
+http://workspace.localhost
+```
+
+If you run many local projects, a single shared Caddy entrypoint is usually easier to manage. Let different projects join the same Docker network and route them by domain, for example:
+
+```text
+workspace.localhost
+blog.localhost
+api.localhost
+```
+
+This avoids every project competing for ports 80 and 443.
+
+## Caddy or Nginx
+
+This project recommends Caddy.
+
+Reasons:
+
+- Shorter configuration for personal projects
+- Easier local multi-project reverse proxy
+- Strong automatic HTTPS support
+- Fewer changes when adding domains later
+
+Nginx is still a solid choice if you already have Nginx operations experience or need complex high-performance gateway rules. For this personal workspace, Caddy is simpler.
 
 ## PM2
 

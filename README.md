@@ -35,7 +35,7 @@ Personal Digital Workspace 是一个轻量的个人网址工作台。它不是�
 
 - 前端：Vue 3、Vite、TypeScript、Pinia、Vue Router、TailwindCSS
 - 后端：Node.js、Express、TypeScript、SQLite
-- 部署：Docker、docker-compose、PM2、Nginx
+- 部署：Docker、docker-compose、Caddy、PM2
 
 ## 项目结构
 
@@ -47,32 +47,20 @@ Personal Digital Workspace 是一个轻量的个人网址工作台。它不是�
 ├── simple.html               # 静态预览页
 ├── Dockerfile
 ├── docker-compose.yml
+├── Caddyfile
 ├── ecosystem.config.cjs
-├── nginx.conf
 ├── .env.example
 └── README.md
 ```
 
 本地运行数据默认保存在 `data/` 目录中，该目录不会提交到 Git。
 
-## 快速开始
+## 快速开始（推荐 Docker）
 
-安装依赖：
-
-```bash
-npm install
-```
-
-构建前端和后端：
+构建并启动容器：
 
 ```bash
-npm run build
-```
-
-启动服务：
-
-```bash
-npm run start
+docker compose up -d --build
 ```
 
 打开：
@@ -81,19 +69,47 @@ npm run start
 http://localhost:4000
 ```
 
-## 开发运行
+查看运行状态：
 
 ```bash
-npm run dev
+docker compose ps
 ```
 
-本项目最终访问入口统一为：
+查看日志：
+
+```bash
+docker compose logs -f workspace
+```
+
+停止：
+
+```bash
+docker compose down
+```
+
+重启：
+
+```bash
+docker compose restart workspace
+```
+
+本地运行数据默认保存在 `./data`，容器内路径是 `/app/data`。
+
+## 本地 Node 运行（可选）
+
+如果不使用 Docker，也可以直接用 Node 运行：
+
+```bash
+npm install
+npm run build
+npm run start
+```
+
+访问地址同样是：
 
 ```text
 http://localhost:4000
 ```
-
-前端请求通过 `/api` 访问后端接口。
 
 ## 书签导入流程
 
@@ -147,36 +163,47 @@ cp .env.example .env
 NODE_ENV=production
 PORT=4000
 DATABASE_PATH=./data/workspace.sqlite
-FRONTEND_ORIGIN=https://workspace.example.com
+FRONTEND_ORIGIN=http://localhost:4000
 ```
 
 ## 修改端口
 
 默认服务端口是 `4000`。
 
-普通本地运行或 PM2 运行时，修改 `.env`：
+Docker 默认把宿主机 `4000` 映射到容器内 `4000`。如果只想修改宿主机访问端口，改 [docker-compose.yml](docker-compose.yml)：
 
-```bash
-PORT=4000
+```yaml
+ports:
+  - "4001:4000"
 ```
 
-如果使用 PM2，同时修改 [ecosystem.config.cjs](ecosystem.config.cjs)：
+这样访问地址会变成：
+
+```text
+http://localhost:4001
+```
+
+如果要修改容器内部应用端口，需要同时修改 [docker-compose.yml](docker-compose.yml) 中的环境变量和端口映射：
+
+```yaml
+environment:
+  PORT: 4000
+ports:
+  - "4000:4000"
+```
+
+如果使用 PM2，修改 [ecosystem.config.cjs](ecosystem.config.cjs)：
 
 ```js
 PORT: 4000
 ```
 
-如果使用 Docker，修改 [docker-compose.yml](docker-compose.yml)：
+如果使用 Caddy 代理，修改 [Caddyfile](Caddyfile)：
 
-```yaml
-environment:
-  PORT: 4000
-```
-
-如果 Nginx 代理到不同内部端口，修改 [nginx.conf](nginx.conf)：
-
-```nginx
-proxy_pass http://workspace:4000;
+```caddyfile
+workspace.localhost {
+  reverse_proxy workspace:4000
+}
 ```
 
 ## 常用脚本
@@ -196,13 +223,52 @@ npm --workspace backend run favicons
 
 ## Docker
 
-构建并启动：
+默认启动应用容器：
 
 ```bash
 docker compose up -d --build
 ```
 
-`docker-compose.yml` 中包含 Nginx，会把请求代理到 workspace 服务。
+停止应用容器：
+
+```bash
+docker compose down
+```
+
+可选启动 Caddy 反向代理：
+
+```bash
+docker compose --profile proxy up -d --build
+```
+
+启用 Caddy 后，可以通过下面地址访问：
+
+```text
+http://workspace.localhost
+```
+
+如果你本地会同时启动很多项目，建议只运行一个统一的 Caddy 入口，让不同项目加入同一个 Docker network，再通过不同域名转发，例如：
+
+```text
+workspace.localhost
+blog.localhost
+api.localhost
+```
+
+这样比每个项目各自占用 80 / 443 更容易管理。
+
+## Caddy 还是 Nginx
+
+本项目推荐 Caddy。
+
+原因：
+
+- 配置更短，更适合个人项目
+- 本地多项目反向代理更方便
+- HTTPS 自动化能力更强
+- 后续加域名时改动少
+
+Nginx 也很稳定，适合已有 Nginx 运维经验、需要复杂高性能网关规则的场景。对这个个人工作台来说，Caddy 更省心。
 
 ## PM2
 
