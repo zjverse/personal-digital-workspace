@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Personal Digital Workspace Preview</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f9f9f9;
+        color: #2c2e2f;
+        font-family: Inter, ui-sans-serif, system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      .page {
+        display: grid;
+        min-height: 100vh;
+        grid-template-columns: 280px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        padding: 16px 10px;
+        background: #2f3542;
+        color: #979898;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 10px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 4px;
+        background: #d6b25e;
+        color: #2f3542;
+        font-weight: 800;
+      }
+
+      .brand strong {
+        display: block;
+        color: #fff;
+        font-size: 18px;
+        line-height: 1.1;
+      }
+
+      .brand span {
+        display: block;
+        margin-top: 4px;
+        font-size: 11px;
+      }
+
+      .search {
+        margin: 16px 6px 10px;
+        padding: 9px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.15);
+        font-size: 13px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 4px;
+      }
+
+      .nav-item {
+        display: flex;
+        min-height: 34px;
+        align-items: center;
+        justify-content: space-between;
+        border-radius: 4px;
+        padding: 6px 8px 6px 14px;
+        color: #979898;
+        font-size: 13px;
+      }
+
+      .nav-item.active,
+      .nav-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #f2d38d;
+      }
+
+      .nav-item small {
+        color: rgba(151, 152, 152, 0.55);
+      }
+
+      .main {
+        min-width: 0;
+        padding: 30px 30px 48px;
+      }
+
+      .header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e4ecf3;
+      }
+
+      h1 {
+        margin: 0;
+        color: #333;
+        font-size: 22px;
+        font-weight: 500;
+      }
+
+      .header p {
+        margin: 8px 0 0;
+        color: #999;
+        font-size: 13px;
+      }
+
+      .bulk {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #999;
+        font-size: 12px;
+      }
+
+      .bulk button {
+        height: 32px;
+        border: 1px solid rgba(214, 178, 94, 0.42);
+        border-radius: 4px;
+        padding: 0 10px;
+        background: #d6b25e;
+        color: #2f3542;
+        font-weight: 700;
+      }
+
+      .section {
+        margin-bottom: 22px;
+      }
+
+      .section h2 {
+        margin: 0 0 12px;
+        color: #979898;
+        font-size: 13px;
+        font-weight: 400;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 15px;
+      }
+
+      .card {
+        position: relative;
+        display: flex;
+        height: 86px;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid #e4ecf3;
+        border-radius: 4px;
+        background: #fff;
+        padding: 15px;
+        text-decoration: none;
+        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-2px);
+        border-color: #d8e3ed;
+        box-shadow: 0 8px 20px rgba(44, 46, 47, 0.08);
+      }
+
+      .check,
+      .star {
+        position: absolute;
+        top: 7px;
+        display: grid;
+        width: 24px;
+        height: 24px;
+        place-items: center;
+        border: 1px solid #e4ecf3;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.94);
+        color: #d6b25e;
+        font-size: 13px;
+      }
+
+      .check {
+        left: 7px;
+      }
+
+      .star {
+        right: 7px;
+      }
+
+      .icon {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 50%;
+        background: #f5f7fa;
+      }
+
+      .icon img {
+        width: 26px;
+        height: 26px;
+      }
+
+      .copy {
+        min-width: 0;
+      }
+
+      .title {
+        display: block;
+        overflow: hidden;
+        color: #333;
+        font-size: 13px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .category {
+        display: block;
+        overflow: hidden;
+        margin-top: 7px;
+        color: #999;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .actions {
+        position: absolute;
+        right: 7px;
+        bottom: 7px;
+        display: inline-flex;
+        gap: 3px;
+      }
+
+      .actions span {
+        display: grid;
+        width: 22px;
+        height: 22px;
+        place-items: center;
+        border: 1px solid #e4ecf3;
+        border-radius: 4px;
+        background: #fff;
+        color: #8b95a1;
+        font-size: 12px;
+      }
+
+      @media (max-width: 900px) {
+        .page {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: relative;
+          height: auto;
+        }
+
+        .main {
+          padding: 22px 16px 32px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">P</div>
+          <div>
+            <strong>PDW</strong>
+            <span>Personal workspace</span>
+          </div>
+        </div>
+        <div class="search">搜索...</div>
+        <nav class="nav">
+          <div class="nav-item active"><span>★ 常用网址</span><small>6</small></div>
+          <div class="nav-item"><span>我的服务</span><small>12</small></div>
+          <div class="nav-item"><span>开发资源</span><small>8</small></div>
+          <div class="nav-item"><span>设计参考</span><small>5</small></div>
+          <div class="nav-item"><span>网络工具</span><small>7</small></div>
+          <div class="nav-item"><span>学习资料</span><small>9</small></div>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="header">
+          <div>
+            <h1>常用网址</h1>
+            <p>这里显示你手动加入的高频入口，共 6 个入口</p>
+          </div>
+          <div class="bulk">
+            <span>已选 2 个</span>
+            <button>打开选中</button>
+          </div>
+        </header>
+
+        <section class="section">
+          <h2>常用网址</h2>
+          <div class="grid">
+            <a class="card" href="https://009tg.com/">
+              <span class="check">✓</span>
+              <span class="star">★</span>
+              <span class="icon"><img src="https://www.google.com/s2/favicons?domain_url=https%3A%2F%2F009tg.com&sz=64" alt="" /></span>
+              <span class="copy"><span class="title">009tg 示例导航</span><span class="category">常用工具</span></span>
+            </a>
+            <a class="card" href="https://github.com/">
+              <span class="check">✓</span>
+              <span class="star">★</span>
+              <span class="icon"><img src="https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fgithub.com&sz=64" alt="" /></span>
+              <span class="copy"><span class="title">GitHub</span><span class="category">开发资源</span></span>
+            </a>
+            <a class="card" href="https://www.cloudflare.com/">
+              <span class="star">★</span>
+              <span class="icon"><img src="https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fcloudflare.com&sz=64" alt="" /></span>
+              <span class="copy"><span class="title">Cloudflare</span><span class="category">网络工具</span></span>
+              <span class="actions"><span>↑</span><span>↓</span></span>
+            </a>
+            <a class="card" href="https://vuejs.org/">
+              <span class="star">★</span>
+              <span class="icon"><img src="https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fvuejs.org&sz=64" alt="" /></span>
+              <span class="copy"><span class="title">Vue.js</span><span class="category">开发资源</span></span>
+            </a>
+            <a class="card" href="https://vite.dev/">
+              <span class="star">★</span>
+              <span class="icon"><img src="https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fvite.dev&sz=64" alt="" /></span>
+              <span class="copy"><span class="title">Vite</span><span class="category">开发资源</span></span>
+            </a>
+            <a class="card" href="https://vercel.com/">
+              <span class="star">★</span>
+              <span class="icon"><img src="https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fvercel.com&sz=64" alt="" /></span>
+              <span class="copy"><span class="title">Vercel</span><span class="category">设计参考</span></span>
+            </a>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
