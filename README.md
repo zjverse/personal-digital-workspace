@@ -3,6 +3,7 @@
 > Vue 3 + Express + SQLite personal bookmark workspace for importing, organizing, searching, and opening browser bookmarks.
 
 一个轻量的个人网址工作台，用来导入浏览器书签，并按原始目录结构展示、搜索和快速打开常用网址。
+<img width="2966" height="1522" alt="image" src="https://github.com/user-attachments/assets/e6f963ff-00d9-461b-9526-0466a62b8137" />
 
 ## Preview
 
