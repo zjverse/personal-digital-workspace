@@ -37,3 +37,7 @@ bookmarks*.json
 .idea/
 .vscode/
 .cache/
+
+# Local-only project notes and private planning records.
+local-notes/
+docs/
