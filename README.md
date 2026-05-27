@@ -88,10 +88,7 @@ npm run dev
 
 Default development ports:
 
-- Backend API: `http://localhost:4000`
-- Frontend Vite dev server: `http://localhost:5173`
-
-The frontend calls backend APIs through `/api`.
+- Frontend Vite dev server: `http://localhost:4000`
 
 ## Bookmark Import Flow
 
