@@ -1,5 +1,7 @@
 # Personal Digital Workspace
 
+> Vue 3 + Express + SQLite personal bookmark workspace for importing, organizing, searching, and opening browser bookmarks.
+
 一个轻量的个人网址工作台，用来导入浏览器书签，并按原始目录结构展示、搜索和快速打开常用网址。
 
 当前仓库只保留最终精简版本：没有登录、没有后台管理、没有智能分类、没有导入历史和数据导出页面。
